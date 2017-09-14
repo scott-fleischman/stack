@@ -444,6 +444,7 @@ data GlobalOpts = GlobalOpts
     , globalColorWhen    :: !ColorWhen -- ^ When to use ansi terminal colors
     , globalTermWidth    :: !(Maybe Int) -- ^ Terminal width override
     , globalStackYaml    :: !(StackYamlLoc FilePath) -- ^ Override project stack.yaml
+    , globalHpack        :: !(Maybe FilePath) -- ^ Use hpack executable
     } deriving (Show)
 
 data StackYamlLoc filepath
@@ -468,6 +469,7 @@ data GlobalOptsMonoid = GlobalOptsMonoid
     , globalMonoidColorWhen    :: !(First ColorWhen) -- ^ When to use ansi colors
     , globalMonoidTermWidth    :: !(First Int) -- ^ Terminal width override
     , globalMonoidStackYaml    :: !(First FilePath) -- ^ Override project stack.yaml
+    , globalMonoidHpack        :: !(First FilePath) -- ^ Use hpack executable
     } deriving (Show, Generic)
 
 instance Monoid GlobalOptsMonoid where

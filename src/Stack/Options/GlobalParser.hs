@@ -51,6 +51,12 @@ globalOptsParser currentDir kind defLogLevel =
              completer (fileExtCompleter [".yaml"]) <>
              help ("Override project stack.yaml file " <>
                    "(overrides any STACK_YAML environment variable)") <>
+             hide)) <*>
+    optionalFirst
+        (strOption
+            (long "hpack" <>
+             metavar "HPACK" <>
+             help "Use hpack executable (overrides bundled hpack)" <>
              hide))
   where
     hide = hideMods hide0
@@ -69,7 +75,8 @@ globalOptsFromMonoid defaultTerminal GlobalOptsMonoid{..} = GlobalOpts
     , globalTerminal = fromFirst defaultTerminal globalMonoidTerminal
     , globalColorWhen = fromFirst ColorAuto globalMonoidColorWhen
     , globalTermWidth = getFirst globalMonoidTermWidth
-    , globalStackYaml = maybe SYLDefault SYLOverride $ getFirst globalMonoidStackYaml }
+    , globalStackYaml = maybe SYLDefault SYLOverride $ getFirst globalMonoidStackYaml
+    , globalHpack = getFirst globalMonoidHpack }
 
 initOptsParser :: Parser InitOpts
 initOptsParser =
