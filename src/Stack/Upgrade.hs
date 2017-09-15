@@ -243,6 +243,7 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
             gConfigMonoid
             mresolver
             (SYLOverride $ dir </> $(mkRelFile "stack.yaml"))
+            Nothing
         bconfig <- liftIO $ lcLoadBuildConfig lc Nothing
         envConfig1 <- runRIO bconfig $ setupEnv $ Just $
             "Try rerunning with --install-ghc to install the correct GHC into " <>

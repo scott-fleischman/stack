@@ -443,10 +443,12 @@ loadConfigMaybeProject
     -- ^ Config monoid from parsed command-line arguments
     -> Maybe AbstractResolver
     -- ^ Override resolver
+    -> Maybe String
+    -- ^ Override hpack
     -> LocalConfigStatus (Project, Path Abs File, ConfigMonoid)
     -- ^ Project config to use, if any
     -> RIO env LoadConfig
-loadConfigMaybeProject configArgs mresolver mproject = do
+loadConfigMaybeProject configArgs mresolver mhpack mproject = do
     (stackRoot, userOwnsStackRoot) <- determineStackRootAndOwnership configArgs
 
     let loadHelper mproject' = do
@@ -486,7 +488,7 @@ loadConfigMaybeProject configArgs mresolver mproject = do
 
     return LoadConfig
         { lcConfig          = config
-        , lcLoadBuildConfig = runRIO config . loadBuildConfig mproject mresolver
+        , lcLoadBuildConfig = runRIO config . loadBuildConfig mproject mresolver mhpack
         , lcProjectRoot     =
             case mprojectRoot of
               LCSProject fp -> Just fp
@@ -504,17 +506,20 @@ loadConfig :: HasRunner env
            -- ^ Override resolver
            -> StackYamlLoc (Path Abs File)
            -- ^ Override stack.yaml
+           -> Maybe String
+           -- ^ Override hpack executable
            -> RIO env LoadConfig
-loadConfig configArgs mresolver mstackYaml =
-    loadProjectConfig mstackYaml >>= loadConfigMaybeProject configArgs mresolver
+loadConfig configArgs mresolver mstackYaml mhpack =
+    loadProjectConfig mstackYaml >>= loadConfigMaybeProject configArgs mresolver mhpack
 
 -- | Load the build configuration, adds build-specific values to config loaded by @loadConfig@.
 -- values.
 loadBuildConfig :: LocalConfigStatus (Project, Path Abs File, ConfigMonoid)
                 -> Maybe AbstractResolver -- override resolver
+                -> Maybe String -- override hpack executable
                 -> Maybe (CompilerVersion 'CVWanted) -- override compiler
                 -> RIO Config BuildConfig
-loadBuildConfig mproject maresolver mcompiler = do
+loadBuildConfig mproject maresolver mhpack mcompiler = do
     config <- ask
 
     -- If provided, turn the AbstractResolver from the command line
@@ -619,6 +624,7 @@ loadBuildConfig mproject maresolver mcompiler = do
                 LCSNoProject -> True
                 LCSProject _ -> False
                 LCSNoConfig _ -> False
+        , bcHpack = mhpack
         }
   where
     getEmptyProject :: Maybe Resolver -> RIO Config Project

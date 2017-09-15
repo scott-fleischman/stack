@@ -107,6 +107,7 @@ withGlobalConfigAndLock go@GlobalOpts{..} inner = withRunnerGlobal go $ \runner 
         loadConfigMaybeProject
             globalConfigMonoid
             Nothing
+            globalHpack
             LCSNoProject
     withUserFileLock go (configStackRoot $ lcConfig lc) $ \_lk ->
         runRIO (lcConfig lc) inner
@@ -199,7 +200,7 @@ loadConfigWithOpts
 loadConfigWithOpts go@GlobalOpts{..} inner = withRunnerGlobal go $ \runner -> do
     mstackYaml <- forM globalStackYaml resolveFile'
     runRIO runner $ do
-        lc <- loadConfig globalConfigMonoid globalResolver mstackYaml
+        lc <- loadConfig globalConfigMonoid globalResolver mstackYaml globalHpack
         -- If we have been relaunched in a Docker container, perform in-container initialization
         -- (switch UID, etc.).  We do this after first loading the configuration since it must
         -- happen ASAP but needs a configuration.
@@ -228,6 +229,7 @@ withMiniConfigAndLock go@GlobalOpts{..} inner = withRunnerGlobal go $ \runner ->
         loadConfigMaybeProject
           globalConfigMonoid
           globalResolver
+          globalHpack
           LCSNoProject
     runRIO miniConfig inner
 
