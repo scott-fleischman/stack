@@ -54,9 +54,9 @@ globalOptsParser currentDir kind defLogLevel =
              hide)) <*>
     optionalFirst
         (strOption
-            (long "hpack" <>
+            (long "with-hpack" <>
              metavar "HPACK" <>
-             help "Use hpack executable (overrides bundled hpack)" <>
+             help "Use Hpack executable (overrides bundled Hpack)" <>
              hide))
   where
     hide = hideMods hide0

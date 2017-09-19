@@ -51,7 +51,7 @@ Behavior changes:
 
 Other enhancements:
 
-* The `--hpack` option specifies an `hpack` executable to use
+* The `--with-hpack` option specifies an Hpack executable to use
   instead of the Hpack bundled with Stack. Please
   see [#3179](https://github.com/commercialhaskell/stack/issues/3179).
 * It's now possible to skip tests and benchmarks using `--skip`

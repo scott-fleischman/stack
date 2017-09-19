@@ -528,4 +528,4 @@ Yes:
 
 * If a package directory contains an Hpack `package.yaml` file, then Stack will use it to generate a `.cabal` file when building the package.
 * You can run `stack init` to initialize a `stack.yaml` file regardless of whether your packages are declared with `.cabal` files or with Hpack `package.yaml` files.
-* You can use the `--hpack` option to specify an `hpack` executable to use instead of the Hpack bundled with Stack.
+* You can use the `--with-hpack` option to specify an Hpack executable to use instead of the Hpack bundled with Stack.
