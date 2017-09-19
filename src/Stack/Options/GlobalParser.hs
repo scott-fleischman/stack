@@ -76,7 +76,7 @@ globalOptsFromMonoid defaultTerminal GlobalOptsMonoid{..} = GlobalOpts
     , globalColorWhen = fromFirst ColorAuto globalMonoidColorWhen
     , globalTermWidth = getFirst globalMonoidTermWidth
     , globalStackYaml = maybe SYLDefault SYLOverride $ getFirst globalMonoidStackYaml
-    , globalHpack = getFirst globalMonoidHpack }
+    , globalHpack = maybe HpackBundled HpackCommand $ getFirst globalMonoidHpack }
 
 initOptsParser :: Parser InitOpts
 initOptsParser =

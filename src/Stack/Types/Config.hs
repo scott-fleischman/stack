@@ -74,6 +74,7 @@ module Stack.Types.Config
   -- ** GlobalOpts & GlobalOptsMonoid
   ,GlobalOpts(..)
   ,GlobalOptsMonoid(..)
+  ,HpackExecutable(..)
   ,StackYamlLoc(..)
   ,defaultLogLevel
   -- ** LoadConfig
@@ -444,8 +445,13 @@ data GlobalOpts = GlobalOpts
     , globalColorWhen    :: !ColorWhen -- ^ When to use ansi terminal colors
     , globalTermWidth    :: !(Maybe Int) -- ^ Terminal width override
     , globalStackYaml    :: !(StackYamlLoc FilePath) -- ^ Override project stack.yaml
-    , globalHpack        :: !(Maybe String) -- ^ Override hpack executable
+    , globalHpack        :: !HpackExecutable -- ^ Override hpack executable
     } deriving (Show)
+
+data HpackExecutable
+    = HpackBundled
+    | HpackCommand String
+    deriving (Show)
 
 data StackYamlLoc filepath
     = SYLDefault
@@ -522,7 +528,7 @@ data BuildConfig = BuildConfig
     , bcImplicitGlobal :: !Bool
       -- ^ Are we loading from the implicit global stack.yaml? This is useful
       -- for providing better error messages.
-    , bcHpack  :: !(Maybe String)
+    , bcHpack  :: !HpackExecutable
       -- ^ Override hpack executable
     }
 

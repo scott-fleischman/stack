@@ -1250,7 +1250,7 @@ loadGhcjsEnvConfig stackYaml binPath = do
             })
         Nothing
         (SYLOverride stackYaml)
-        Nothing
+        HpackBundled
     bconfig <- liftIO $ lcLoadBuildConfig lc Nothing
     runRIO bconfig $ setupEnv Nothing
 

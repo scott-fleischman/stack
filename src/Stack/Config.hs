@@ -443,7 +443,7 @@ loadConfigMaybeProject
     -- ^ Config monoid from parsed command-line arguments
     -> Maybe AbstractResolver
     -- ^ Override resolver
-    -> Maybe String
+    -> HpackExecutable
     -- ^ Override hpack
     -> LocalConfigStatus (Project, Path Abs File, ConfigMonoid)
     -- ^ Project config to use, if any
@@ -506,7 +506,7 @@ loadConfig :: HasRunner env
            -- ^ Override resolver
            -> StackYamlLoc (Path Abs File)
            -- ^ Override stack.yaml
-           -> Maybe String
+           -> HpackExecutable
            -- ^ Override hpack executable
            -> RIO env LoadConfig
 loadConfig configArgs mresolver mstackYaml mhpack =
@@ -516,7 +516,7 @@ loadConfig configArgs mresolver mstackYaml mhpack =
 -- values.
 loadBuildConfig :: LocalConfigStatus (Project, Path Abs File, ConfigMonoid)
                 -> Maybe AbstractResolver -- override resolver
-                -> Maybe String -- override hpack executable
+                -> HpackExecutable -- override hpack executable
                 -> Maybe (CompilerVersion 'CVWanted) -- override compiler
                 -> RIO Config BuildConfig
 loadBuildConfig mproject maresolver mhpack mcompiler = do
