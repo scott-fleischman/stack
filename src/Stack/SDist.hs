@@ -238,8 +238,8 @@ gtraverseT f =
 readLocalPackage :: HasEnvConfig env => Path Abs Dir -> RIO env LocalPackage
 readLocalPackage pkgDir = do
     menv <- getMinimalEnvOverride
-    hpackExecutable <- view hpackExecutableL
-    cabalfp <- findOrGenerateCabalFile pkgDir menv hpackExecutable
+    mhpack <- view hpackExecutableL
+    cabalfp <- findOrGenerateCabalFile pkgDir menv mhpack
     config  <- getDefaultPackageConfig
     (warnings,package) <- readPackage config cabalfp
     mapM_ (printCabalFileWarning cabalfp) warnings
