@@ -871,14 +871,15 @@ imgDockerCmd (rebuild,images) go@GlobalOpts{..} = loadConfigWithOpts go $ \lc ->
 initCmd :: InitOpts -> GlobalOpts -> IO ()
 initCmd initOpts go = do
     pwd <- getCurrentDir
-    withMiniConfigAndLock go (initProject IsInitCmd pwd initOpts (globalResolver go))
+    let hpackExecutable = globalHpack go
+    withMiniConfigAndLock go (initProject IsInitCmd pwd hpackExecutable initOpts (globalResolver go))
 
 -- | Create a project directory structure and initialize the stack config.
 newCmd :: (NewOpts,InitOpts) -> GlobalOpts -> IO ()
 newCmd (newOpts,initOpts) go@GlobalOpts{..} =
     withMiniConfigAndLock go $ do
         dir <- new newOpts (forceOverwrite initOpts)
-        initProject IsNewCmd dir initOpts globalResolver
+        initProject IsNewCmd dir globalHpack initOpts globalResolver
 
 -- | List the available templates.
 templatesCmd :: () -> GlobalOpts -> IO ()

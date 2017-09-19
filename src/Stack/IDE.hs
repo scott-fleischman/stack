@@ -26,9 +26,11 @@ listPackages = do
     -- TODO: Instead of setting up an entire EnvConfig only to look up the package directories,
     -- make do with a Config (and the Project inside) and use resolvePackageEntry to get
     -- the directory.
+    menv <- getMinimalEnvOverride
+    hpackExecutable <- view hpackExecutableL
     packageDirs <- liftM (map lpvRoot . Map.elems . lpProject) getLocalPackages
     forM_ packageDirs $ \dir -> do
-        cabalfp <- findOrGenerateCabalFile dir
+        cabalfp <- findOrGenerateCabalFile dir menv hpackExecutable
         pkgName <- parsePackageNameFromFilePath cabalfp
         (logInfo . packageNameText) pkgName
 

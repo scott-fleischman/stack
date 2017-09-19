@@ -281,9 +281,10 @@ withLoadPackage inner = do
     menv <- getMinimalEnvOverride
     root <- view projectRootL
     run <- askRunInIO
+    hpackExecutable <- view hpackExecutableL
     withCabalLoader $ \loadFromIndex ->
         inner $ \loc flags ghcOptions -> do
-            bs <- run $ loadSingleRawCabalFile loadFromIndex menv root loc
+            bs <- run $ loadSingleRawCabalFile loadFromIndex menv root hpackExecutable loc
 
             -- Intentionally ignore warnings, as it's not really
             -- appropriate to print a bunch of warnings out while

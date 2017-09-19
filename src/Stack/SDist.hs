@@ -237,7 +237,9 @@ gtraverseT f =
 -- use-cases.
 readLocalPackage :: HasEnvConfig env => Path Abs Dir -> RIO env LocalPackage
 readLocalPackage pkgDir = do
-    cabalfp <- findOrGenerateCabalFile pkgDir
+    menv <- getMinimalEnvOverride
+    hpackExecutable <- view hpackExecutableL
+    cabalfp <- findOrGenerateCabalFile pkgDir menv hpackExecutable
     config  <- getDefaultPackageConfig
     (warnings,package) <- readPackage config cabalfp
     mapM_ (printCabalFileWarning cabalfp) warnings
@@ -343,10 +345,12 @@ checkPackageInExtractedTarball
   => Path Abs Dir -- ^ Absolute path to tarball
   -> RIO env ()
 checkPackageInExtractedTarball pkgDir = do
-    cabalfp <- findOrGenerateCabalFile pkgDir
+    menv <- getMinimalEnvOverride
+    hpackExecutable <- view hpackExecutableL
+    cabalfp <- findOrGenerateCabalFile pkgDir menv hpackExecutable
     name    <- parsePackageNameFromFilePath cabalfp
     config  <- getDefaultPackageConfig
-    (gdesc, PackageDescriptionPair pkgDesc _) <- readPackageDescriptionDir config pkgDir
+    (gdesc, PackageDescriptionPair pkgDesc _) <- readPackageDescriptionDir config pkgDir menv hpackExecutable
     logInfo $
         "Checking package '" <> packageNameText name <> "' for common mistakes"
     let pkgChecks = Check.checkPackage gdesc (Just pkgDesc)

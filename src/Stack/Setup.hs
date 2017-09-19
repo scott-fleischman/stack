@@ -263,6 +263,7 @@ setupEnv mResolveMissingGHC = do
       menv
       (Just compilerVer)
       (view projectRootL bc)
+      (bcHpackExecutable bc)
       (bcSnapshotDef bc)
     let envConfig0 = EnvConfig
             { envConfigBuildConfig = bc

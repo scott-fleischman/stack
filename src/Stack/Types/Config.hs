@@ -41,6 +41,7 @@ module Stack.Types.Config
   ,LocalPackageView(..)
   ,NamedComponent(..)
   ,stackYamlL
+  ,hpackExecutableL
   ,projectRootL
   ,HasBuildConfig(..)
   -- ** GHCVariant & HasGHCVariant
@@ -528,12 +529,15 @@ data BuildConfig = BuildConfig
     , bcImplicitGlobal :: !Bool
       -- ^ Are we loading from the implicit global stack.yaml? This is useful
       -- for providing better error messages.
-    , bcHpack  :: !HpackExecutable
+    , bcHpackExecutable  :: !HpackExecutable
       -- ^ Override hpack executable
     }
 
 stackYamlL :: HasBuildConfig env => Lens' env (Path Abs File)
 stackYamlL = buildConfigL.lens bcStackYaml (\x y -> x { bcStackYaml = y })
+
+hpackExecutableL :: HasBuildConfig env => Lens' env HpackExecutable
+hpackExecutableL = buildConfigL.lens bcHpackExecutable (\x y -> x { bcHpackExecutable = y })
 
 -- | Directory containing the project's stack.yaml file
 projectRootL :: HasBuildConfig env => Getting r env (Path Abs Dir)

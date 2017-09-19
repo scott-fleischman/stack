@@ -234,15 +234,16 @@ loadSingleRawCabalFile
   => (PackageIdentifierRevision -> IO ByteString) -- ^ lookup in index
   -> EnvOverride
   -> Path Abs Dir -- ^ project root, used for checking out necessary files
+  -> HpackExecutable
   -> PackageLocationIndex FilePath
   -> RIO env ByteString
 -- Need special handling of PLIndex for efficiency (just read from the
 -- index tarball) and correctness (get the cabal file from the index,
 -- not the package tarball itself, yay Hackage revisions).
-loadSingleRawCabalFile loadFromIndex _ _ (PLIndex pir) = liftIO $ loadFromIndex pir
-loadSingleRawCabalFile _ menv root (PLOther loc) =
+loadSingleRawCabalFile loadFromIndex _ _ _ (PLIndex pir) = liftIO $ loadFromIndex pir
+loadSingleRawCabalFile _ menv root hpackExectuable (PLOther loc) =
   resolveSinglePackageLocation menv root loc >>=
-  findOrGenerateCabalFile >>=
+  (\pkgDir -> findOrGenerateCabalFile pkgDir menv hpackExectuable) >>=
   liftIO . S.readFile . toFilePath
 
 -- | Same as 'loadMultiRawCabalFiles' but for 'PackageLocationIndex'.
@@ -252,16 +253,17 @@ loadMultiRawCabalFilesIndex
   => (PackageIdentifierRevision -> IO ByteString) -- ^ lookup in index
   -> EnvOverride
   -> Path Abs Dir -- ^ project root, used for checking out necessary files
+  -> HpackExecutable
   -> PackageLocationIndex Subdirs
   -> RIO env [(ByteString, PackageLocationIndex FilePath)]
 -- Need special handling of PLIndex for efficiency (just read from the
 -- index tarball) and correctness (get the cabal file from the index,
 -- not the package tarball itself, yay Hackage revisions).
-loadMultiRawCabalFilesIndex loadFromIndex _ _ (PLIndex pir) = do
+loadMultiRawCabalFilesIndex loadFromIndex _ _ _ (PLIndex pir) = do
   bs <- liftIO $ loadFromIndex pir
   return [(bs, PLIndex pir)]
-loadMultiRawCabalFilesIndex _ x y (PLOther z) =
-  map (second PLOther) <$> loadMultiRawCabalFiles x y z
+loadMultiRawCabalFilesIndex _ x y hpackExectuable (PLOther z) =
+  map (second PLOther) <$> loadMultiRawCabalFiles x y hpackExectuable z
 
 -- | Same as 'loadSingleRawCabalFile', but for 'PackageLocation' There
 -- may be multiple results if dealing with a repository with subdirs,
@@ -272,12 +274,13 @@ loadMultiRawCabalFiles
      HasConfig env
   => EnvOverride
   -> Path Abs Dir -- ^ project root, used for checking out necessary files
+  -> HpackExecutable
   -> PackageLocation Subdirs
   -> RIO env [(ByteString, PackageLocation FilePath)]
-loadMultiRawCabalFiles menv root loc =
+loadMultiRawCabalFiles menv root hpackExectuable loc =
     resolveMultiPackageLocation menv root loc >>= mapM go
   where
     go (dir, loc') = do
-      cabalFile <- findOrGenerateCabalFile dir
+      cabalFile <- findOrGenerateCabalFile dir menv hpackExectuable
       bs <- liftIO $ S.readFile $ toFilePath cabalFile
       return (bs, loc')

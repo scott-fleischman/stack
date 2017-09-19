@@ -624,7 +624,7 @@ loadBuildConfig mproject maresolver mhpack mcompiler = do
                 LCSNoProject -> True
                 LCSProject _ -> False
                 LCSNoConfig _ -> False
-        , bcHpack = mhpack
+        , bcHpackExecutable = mhpack
         }
   where
     getEmptyProject :: Maybe Resolver -> RIO Config Project
@@ -659,9 +659,10 @@ getLocalPackages = do
             menv <- getMinimalEnvOverride
             root <- view projectRootL
             bc <- view buildConfigL
-
+            let hpackExecutable = bcHpackExecutable bc
+            
             packages <- do
-              bss <- concat <$> mapM (loadMultiRawCabalFiles menv root) (bcPackages bc)
+              bss <- concat <$> mapM (loadMultiRawCabalFiles menv root hpackExecutable) (bcPackages bc)
               forM bss $ \(bs, loc) -> do
                 (warnings, gpd) <-
                   case rawParseGPD bs of
@@ -672,7 +673,7 @@ getLocalPackages = do
                          $ C.package
                          $ C.packageDescription gpd
                 dir <- resolveSinglePackageLocation menv root loc
-                cabalfp <- findOrGenerateCabalFile dir
+                cabalfp <- findOrGenerateCabalFile dir menv hpackExecutable
                 mapM_ (printCabalFileWarning cabalfp) warnings
                 checkCabalFileName name cabalfp
                 let lpv = LocalPackageView
@@ -685,7 +686,7 @@ getLocalPackages = do
                       }
                 return (name, lpv)
 
-            deps <- mapM (loadMultiRawCabalFilesIndex loadFromIndex menv root) (bcDependencies bc)
+            deps <- mapM (loadMultiRawCabalFilesIndex loadFromIndex menv root hpackExecutable) (bcDependencies bc)
                 >>= mapM (\(bs, loc :: PackageLocationIndex FilePath) -> do
                      (_warnings, gpd) <- do
                        case rawParseGPD bs of

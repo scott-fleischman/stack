@@ -362,6 +362,7 @@ solveResolverSpec
     :: (HasConfig env, HasGHCVariant env)
     => Path Abs File  -- ^ stack.yaml file location
     -> [Path Abs Dir] -- ^ package dirs containing cabal files
+    -> HpackExecutable
     -> ( SnapshotDef
        , ConstraintSpec
        , ConstraintSpec) -- ^ ( resolver
@@ -372,12 +373,12 @@ solveResolverSpec
        -- ^ (Conflicting packages
        --    (resulting src package specs, external dependency specs))
 
-solveResolverSpec stackYaml cabalDirs
+solveResolverSpec stackYaml cabalDirs hpackExecutable
                   (sd, srcConstraints, extraConstraints) = do
     logInfo $ "Using resolver: " <> sdResolverName sd
     let wantedCompilerVersion = sdWantedCompilerVersion sd
     (menv, compilerVersion) <- setupCabalEnv wantedCompilerVersion
-    (compilerVer, snapConstraints) <- getResolverConstraints menv (Just compilerVersion) stackYaml sd
+    (compilerVer, snapConstraints) <- getResolverConstraints menv (Just compilerVersion) stackYaml hpackExecutable sd
 
     let -- Note - The order in Map.union below is important.
         -- We want to override snapshot with extra deps
@@ -472,12 +473,13 @@ getResolverConstraints
     => EnvOverride -- ^ for running Git/Hg clone commands
     -> Maybe (CompilerVersion 'CVActual) -- ^ actually installed compiler
     -> Path Abs File
+    -> HpackExecutable
     -> SnapshotDef
     -> RIO env
          (CompilerVersion 'CVActual,
           Map PackageName (Version, Map FlagName Bool))
-getResolverConstraints menv mcompilerVersion stackYaml sd = do
-    ls <- loadSnapshot menv mcompilerVersion (parent stackYaml) sd
+getResolverConstraints menv mcompilerVersion stackYaml hpackExecutable sd = do
+    ls <- loadSnapshot menv mcompilerVersion (parent stackYaml) hpackExecutable sd
     return (lsCompilerVersion ls, lsConstraints ls)
   where
     lpiConstraints lpi = (lpiVersion lpi, lpiFlags lpi)
@@ -490,10 +492,10 @@ getResolverConstraints menv mcompilerVersion stackYaml sd = do
 -- file.
 -- Subdirectories can be included depending on the @recurse@ parameter.
 findCabalFiles
-  :: (MonadIO m, MonadLogger m, HasRunner env, MonadReader env m)
-  => Bool -> Path Abs Dir -> m [Path Abs File]
-findCabalFiles recurse dir = do
-    liftIO (findFiles dir isHpack subdirFilter) >>= mapM_ (hpack . parent)
+  :: (MonadIO m, MonadUnliftIO m, MonadLogger m, HasRunner env, MonadReader env m)
+  => Bool -> EnvOverride -> HpackExecutable -> Path Abs Dir -> m [Path Abs File]
+findCabalFiles recurse menv hpackExecutable dir = do
+    liftIO (findFiles dir isHpack subdirFilter) >>= mapM_ ((\pkgDir -> hpack pkgDir menv hpackExecutable) . parent)
     liftIO (findFiles dir isCabal subdirFilter)
   where
     subdirFilter subdir = recurse && not (isIgnored subdir)
@@ -586,13 +588,15 @@ formatGroup :: [String] -> String
 formatGroup = concatMap (\path -> "- " <> path <> "\n")
 
 reportMissingCabalFiles
-  :: (MonadIO m, MonadThrow m, MonadLogger m,
+  :: (MonadIO m, MonadUnliftIO m, MonadThrow m, MonadLogger m,
       HasRunner env, MonadReader env m)
-  => [Path Abs File]   -- ^ Directories to scan
+  => EnvOverride
+  -> HpackExecutable
+  -> [Path Abs File]   -- ^ Directories to scan
   -> Bool              -- ^ Whether to scan sub-directories
   -> m ()
-reportMissingCabalFiles cabalfps includeSubdirs = do
-    allCabalfps <- findCabalFiles includeSubdirs =<< getCurrentDir
+reportMissingCabalFiles menv hpackExecutable cabalfps includeSubdirs = do
+    allCabalfps <- findCabalFiles includeSubdirs menv hpackExecutable =<< getCurrentDir
 
     relpaths <- mapM prettyPath (allCabalfps \\ cabalfps)
     unless (null relpaths) $ do
@@ -632,7 +636,9 @@ solveExtraDeps modStackYaml = do
         cabalfps  = map lpvCabalFP $ Map.elems packages
     -- TODO when solver supports --ignore-subdirs option pass that as the
     -- second argument here.
-    reportMissingCabalFiles cabalfps True
+    menv <- getMinimalEnvOverride
+    let hpackExecutable = bcHpackExecutable bconfig
+    reportMissingCabalFiles menv hpackExecutable cabalfps True
     (bundle, _) <- cabalPackagesCheck cabalfps noPkgMsg (Just dupPkgFooter)
 
     let gpds              = Map.elems $ fmap snd bundle
@@ -647,12 +653,12 @@ solveExtraDeps modStackYaml = do
         srcConstraints    = mergeConstraints oldSrcs oldSrcFlags
         extraConstraints  = mergeConstraints oldExtraVersions oldExtraFlags
 
-    resolverResult <- checkSnapBuildPlan (parent stackYaml) gpds (Just oldSrcFlags) sd
+    resolverResult <- checkSnapBuildPlan (parent stackYaml) hpackExecutable gpds (Just oldSrcFlags) sd
     resultSpecs <- case resolverResult of
         BuildPlanCheckOk flags ->
             return $ Just (mergeConstraints oldSrcs flags, Map.empty)
         BuildPlanCheckPartial {} -> do
-            eres <- solveResolverSpec stackYaml cabalDirs
+            eres <- solveResolverSpec stackYaml cabalDirs hpackExecutable
                               (sd, srcConstraints, extraConstraints)
             -- TODO Solver should also use the init code to ignore incompatible
             -- packages

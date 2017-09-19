@@ -524,8 +524,9 @@ parseTargets needTargets boptscli = do
       drops = Set.empty -- not supported to add drops
 
   (globals', snapshots, locals') <- withCabalLoader $ \loadFromIndex -> do
+    hpackExecutable <- view hpackExecutableL
     addedDeps' <- fmap Map.fromList $ forM (Map.toList addedDeps) $ \(name, loc) -> do
-      bs <- loadSingleRawCabalFile loadFromIndex menv root loc
+      bs <- loadSingleRawCabalFile loadFromIndex menv root hpackExecutable loc
       case rawParseGPD bs of
         Left e -> throwIO $ InvalidCabalFileInLocal loc e bs
         Right (_warnings, gpd) -> return (name, (gpd, loc, Nothing))
@@ -548,7 +549,7 @@ parseTargets needTargets boptscli = do
           ]
 
     calculatePackagePromotion
-      loadFromIndex menv root ls0 (Map.elems allLocals)
+      loadFromIndex menv root hpackExecutable ls0 (Map.elems allLocals)
       flags hides options drops
 
   let ls = LoadedSnapshot

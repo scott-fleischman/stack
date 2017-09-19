@@ -99,6 +99,8 @@ import qualified System.Directory as D
 import           System.FilePath (splitExtensions, replaceExtension)
 import qualified System.FilePath as FilePath
 import           System.IO.Error
+import           System.Process.Read (EnvOverride)
+import           System.Process.Run (runCmd, Cmd(..))
 
 data Ctx = Ctx { ctxFile :: !(Path Abs File)
                , ctxDir :: !(Path Abs Dir)
@@ -171,13 +173,15 @@ readPackageBS packageConfig loc bs =
 -- | Get 'GenericPackageDescription' and 'PackageDescription' reading info
 -- from given directory.
 readPackageDescriptionDir
-  :: (MonadLogger m, MonadIO m, MonadThrow m, HasRunner env,
+  :: (MonadLogger m, MonadIO m, MonadUnliftIO m, MonadThrow m, HasRunner env,
       MonadReader env m)
   => PackageConfig
   -> Path Abs Dir
+  -> EnvOverride
+  -> HpackExecutable
   -> m (GenericPackageDescription, PackageDescriptionPair)
-readPackageDescriptionDir config pkgDir = do
-    cabalfp <- findOrGenerateCabalFile pkgDir
+readPackageDescriptionDir config pkgDir envOverride hpackExecutable = do
+    cabalfp <- findOrGenerateCabalFile pkgDir envOverride hpackExecutable
     gdesc   <- liftM snd (readPackageUnresolved cabalfp)
     return (gdesc, resolvePackageDescription config gdesc)
 
@@ -1280,11 +1284,13 @@ logPossibilities dirs mn = do
 -- generate a .cabal file from it.
 findOrGenerateCabalFile
     :: forall m env.
-          (MonadIO m, MonadLogger m, HasRunner env, MonadReader env m)
+          (MonadIO m, MonadUnliftIO m, MonadLogger m, HasRunner env, MonadReader env m)
     => Path Abs Dir -- ^ package directory
+    -> EnvOverride
+    -> HpackExecutable -- ^ override hpack executable
     -> m (Path Abs File)
-findOrGenerateCabalFile pkgDir = do
-    hpack pkgDir
+findOrGenerateCabalFile pkgDir envOverride hpackExecutable = do
+    hpack pkgDir envOverride hpackExecutable
     findCabalFile
   where
     findCabalFile :: m (Path Abs File)
@@ -1309,30 +1315,35 @@ findOrGenerateCabalFile pkgDir = do
       where hasExtension fp x = FilePath.takeExtension fp == "." ++ x
 
 -- | Generate .cabal file from package.yaml, if necessary.
-hpack :: (MonadIO m, MonadLogger m, HasRunner env, MonadReader env m)
-      => Path Abs Dir -> m ()
-hpack pkgDir = do
+hpack :: (MonadIO m, MonadUnliftIO m, MonadLogger m, HasRunner env, MonadReader env m)
+      => Path Abs Dir -> EnvOverride -> HpackExecutable -> m ()
+hpack pkgDir envOverride hpackExecutable = do
     let hpackFile = pkgDir </> $(mkRelFile Hpack.packageConfig)
     exists <- liftIO $ doesFileExist hpackFile
     when exists $ do
         prettyDebugL [flow "Running hpack on", display hpackFile]
+        case hpackExecutable of
+            HpackBundled -> do
 #if MIN_VERSION_hpack(0,18,0)
-        r <- liftIO $ Hpack.hpackResult (Just $ toFilePath pkgDir)
+                r <- liftIO $ Hpack.hpackResult (Just $ toFilePath pkgDir)
 #else
-        r <- liftIO $ Hpack.hpackResult (toFilePath pkgDir)
+                r <- liftIO $ Hpack.hpackResult (toFilePath pkgDir)
 #endif
-        forM_ (Hpack.resultWarnings r) prettyWarnS
-        let cabalFile = styleFile . fromString . Hpack.resultCabalFile $ r
-        case Hpack.resultStatus r of
-            Hpack.Generated -> prettyDebugL
-                [flow "hpack generated a modified version of", cabalFile]
-            Hpack.OutputUnchanged -> prettyDebugL
-                [flow "hpack output unchanged in", cabalFile]
-            Hpack.AlreadyGeneratedByNewerHpack -> prettyWarnL
-                [ cabalFile
-                , flow "was generated with a newer version of hpack,"
-                , flow "please upgrade and try again."
-                ]
+                forM_ (Hpack.resultWarnings r) prettyWarnS
+                let cabalFile = styleFile . fromString . Hpack.resultCabalFile $ r
+                case Hpack.resultStatus r of
+                    Hpack.Generated -> prettyDebugL
+                        [flow "hpack generated a modified version of", cabalFile]
+                    Hpack.OutputUnchanged -> prettyDebugL
+                        [flow "hpack output unchanged in", cabalFile]
+                    Hpack.AlreadyGeneratedByNewerHpack -> prettyWarnL
+                        [ cabalFile
+                        , flow "was generated with a newer version of hpack,"
+                        , flow "please upgrade and try again."
+                        ]
+            HpackCommand command -> do
+                let cmd = Cmd (Just pkgDir) command envOverride []
+                runCmd cmd Nothing
 
 -- | Path for the package's build log.
 buildLogPath :: (MonadReader env m, HasBuildConfig env, MonadThrow m)

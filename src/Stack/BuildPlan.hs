@@ -393,14 +393,15 @@ instance Show BuildPlanCheck where
 checkSnapBuildPlan
     :: (HasConfig env, HasGHCVariant env)
     => Path Abs Dir -- ^ project root, used for checking out necessary files
+    -> HpackExecutable
     -> [GenericPackageDescription]
     -> Maybe (Map PackageName (Map FlagName Bool))
     -> SnapshotDef
     -> RIO env BuildPlanCheck
-checkSnapBuildPlan root gpds flags snapshotDef = do
+checkSnapBuildPlan root hpackExecutable gpds flags snapshotDef = do
     platform <- view platformL
     menv <- getMinimalEnvOverride
-    rs <- loadSnapshot menv Nothing root snapshotDef
+    rs <- loadSnapshot menv Nothing root hpackExecutable snapshotDef
 
     let
         compiler = lsCompilerVersion rs
@@ -430,10 +431,11 @@ checkSnapBuildPlan root gpds flags snapshotDef = do
 selectBestSnapshot
     :: (HasConfig env, HasGHCVariant env)
     => Path Abs Dir -- ^ project root, used for checking out necessary files
+    -> HpackExecutable
     -> [GenericPackageDescription]
     -> NonEmpty SnapshotDef
     -> RIO env (SnapshotDef, BuildPlanCheck)
-selectBestSnapshot root gpds snaps = do
+selectBestSnapshot root hpackExecutable gpds snaps = do
     logInfo $ "Selecting the best among "
                <> T.pack (show (NonEmpty.length snaps))
                <> " snapshots...\n"
@@ -446,7 +448,7 @@ selectBestSnapshot root gpds snaps = do
                 _ -> fmap (betterSnap old) mnew
 
         getResult snap = do
-            result <- checkSnapBuildPlan root gpds Nothing snap
+            result <- checkSnapBuildPlan root hpackExecutable gpds Nothing snap
             reportResult result snap
             return (snap, result)
 

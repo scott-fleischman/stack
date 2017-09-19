@@ -98,7 +98,8 @@ loadSourceMapFull needTargets boptsCli = do
               menv <- getMinimalEnvOverride
               root <- view projectRootL
               dir <- resolveSinglePackageLocation menv root pl
-              cabalfp <- findOrGenerateCabalFile dir
+              hpackExecutable <- view hpackExecutableL
+              cabalfp <- findOrGenerateCabalFile dir menv hpackExecutable
               bs <- liftIO (S.readFile (toFilePath cabalfp))
               (warnings, gpd) <-
                 case rawParseGPD bs of

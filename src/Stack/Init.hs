@@ -50,10 +50,11 @@ initProject
     :: (HasConfig env, HasGHCVariant env)
     => WhichSolverCmd
     -> Path Abs Dir
+    -> HpackExecutable
     -> InitOpts
     -> Maybe AbstractResolver
     -> RIO env ()
-initProject whichCmd currDir initOpts mresolver = do
+initProject whichCmd currDir hpackExecutable initOpts mresolver = do
     let dest = currDir </> stackDotYaml
 
     reldest <- toFilePath `liftM` makeRelativeToCurrentDir dest
@@ -66,15 +67,16 @@ initProject whichCmd currDir initOpts mresolver = do
              \'--force' to overwrite it.")
 
     dirs <- mapM (resolveDir' . T.unpack) (searchDirs initOpts)
+    menv <- getMinimalEnvOverride
     let noPkgMsg =  "In order to init, you should have an existing .cabal \
                     \file. Please try \"stack new\" instead."
-        find  = findCabalFiles (includeSubDirs initOpts)
+        find  = findCabalFiles (includeSubDirs initOpts) menv hpackExecutable
         dirs' = if null dirs then [currDir] else dirs
     logInfo "Looking for .cabal or package.yaml files to use to init the project."
     cabalfps <- liftM concat $ mapM find dirs'
     (bundle, dupPkgs)  <- cabalPackagesCheck cabalfps noPkgMsg Nothing
 
-    (sd, flags, extraDeps, rbundle) <- getDefaultResolver whichCmd dest initOpts
+    (sd, flags, extraDeps, rbundle) <- getDefaultResolver whichCmd dest hpackExecutable initOpts
                                                           mresolver bundle
 
     -- Kind of inefficient, since we've already parsed this value. But
@@ -338,6 +340,7 @@ getDefaultResolver
     :: (HasConfig env, HasGHCVariant env)
     => WhichSolverCmd
     -> Path Abs File   -- ^ stack.yaml
+    -> HpackExecutable
     -> InitOpts
     -> Maybe AbstractResolver
     -> Map PackageName (Path Abs File, C.GenericPackageDescription)
@@ -351,9 +354,9 @@ getDefaultResolver
        --   , Flags for src packages and extra deps
        --   , Extra dependencies
        --   , Src packages actually considered)
-getDefaultResolver whichCmd stackYaml initOpts mresolver bundle = do
+getDefaultResolver whichCmd stackYaml hpackExecutable initOpts mresolver bundle = do
     sd <- maybe selectSnapResolver (makeConcreteResolver (Just root) >=> loadResolver) mresolver
-    getWorkingResolverPlan whichCmd stackYaml initOpts bundle sd
+    getWorkingResolverPlan whichCmd stackYaml hpackExecutable initOpts bundle sd
     where
         root = parent stackYaml
         -- TODO support selecting best across regular and custom snapshots
@@ -361,7 +364,7 @@ getDefaultResolver whichCmd stackYaml initOpts mresolver bundle = do
             let gpds = Map.elems (fmap snd bundle)
             snaps <- fmap getRecommendedSnapshots getSnapshots'
             sds <- mapM (loadResolver . ResolverSnapshot) snaps
-            (s, r) <- selectBestSnapshot (parent stackYaml) gpds sds
+            (s, r) <- selectBestSnapshot (parent stackYaml) hpackExecutable gpds sds
             case r of
                 BuildPlanCheckFail {} | not (omitPackages initOpts)
                         -> throwM (NoMatchingSnapshot whichCmd snaps)
@@ -371,6 +374,7 @@ getWorkingResolverPlan
     :: (HasConfig env, HasGHCVariant env)
     => WhichSolverCmd
     -> Path Abs File   -- ^ stack.yaml
+    -> HpackExecutable
     -> InitOpts
     -> Map PackageName (Path Abs File, C.GenericPackageDescription)
        -- ^ Src package name: cabal dir, cabal package description
@@ -384,12 +388,12 @@ getWorkingResolverPlan
        --   , Flags for src packages and extra deps
        --   , Extra dependencies
        --   , Src packages actually considered)
-getWorkingResolverPlan whichCmd stackYaml initOpts bundle sd = do
+getWorkingResolverPlan whichCmd stackYaml hpackExecutable initOpts bundle sd = do
     logInfo $ "Selected resolver: " <> sdResolverName sd
     go bundle
     where
         go info = do
-            eres <- checkBundleResolver whichCmd stackYaml initOpts info sd
+            eres <- checkBundleResolver whichCmd stackYaml hpackExecutable initOpts info sd
             -- if some packages failed try again using the rest
             case eres of
                 Right (f, edeps)-> return (sd, f, edeps, info)
@@ -423,6 +427,7 @@ checkBundleResolver
     :: (HasConfig env, HasGHCVariant env)
     => WhichSolverCmd
     -> Path Abs File   -- ^ stack.yaml
+    -> HpackExecutable
     -> InitOpts
     -> Map PackageName (Path Abs File, C.GenericPackageDescription)
        -- ^ Src package name: cabal dir, cabal package description
@@ -430,8 +435,8 @@ checkBundleResolver
     -> RIO env
          (Either [PackageName] ( Map PackageName (Map FlagName Bool)
                                , Map PackageName Version))
-checkBundleResolver whichCmd stackYaml initOpts bundle sd = do
-    result <- checkSnapBuildPlan (parent stackYaml) gpds Nothing sd
+checkBundleResolver whichCmd stackYaml hpackExecutable initOpts bundle sd = do
+    result <- checkSnapBuildPlan (parent stackYaml) hpackExecutable gpds Nothing sd
     case result of
         BuildPlanCheckOk f -> return $ Right (f, Map.empty)
         BuildPlanCheckPartial f e
@@ -465,7 +470,7 @@ checkBundleResolver whichCmd stackYaml initOpts bundle sd = do
           let cabalDirs      = map parent (Map.elems (fmap fst bundle))
               srcConstraints = mergeConstraints (gpdPackages gpds) flags
 
-          eresult <- solveResolverSpec stackYaml cabalDirs
+          eresult <- solveResolverSpec stackYaml cabalDirs hpackExecutable
                                        (sd, srcConstraints, Map.empty)
           case eresult of
               Right (src, ext) ->
@@ -484,7 +489,7 @@ checkBundleResolver whichCmd stackYaml initOpts bundle sd = do
       findOneIndependent packages flags = do
           platform <- view platformL
           menv <- getMinimalEnvOverride
-          (compiler, _) <- getResolverConstraints menv Nothing stackYaml sd
+          (compiler, _) <- getResolverConstraints menv Nothing stackYaml hpackExecutable sd
           let getGpd pkg = snd (fromMaybe (error "findOneIndependent: getGpd") (Map.lookup pkg bundle))
               getFlags pkg = fromMaybe (error "fromOneIndependent: getFlags") (Map.lookup pkg flags)
               deps pkg = gpdPackageDeps (getGpd pkg) compiler platform
