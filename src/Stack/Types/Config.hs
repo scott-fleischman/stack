@@ -308,6 +308,8 @@ data Config =
          -- ^ How many concurrent jobs to run, defaults to number of capabilities
          ,configOverrideGccPath     :: !(Maybe (Path Abs File))
          -- ^ Optional gcc override path
+         ,configOverrideHpack       :: !HpackExecutable
+         -- ^ Override Hpack executable
          ,configExtraIncludeDirs    :: !(Set FilePath)
          -- ^ --extra-include-dirs arguments
          ,configExtraLibDirs        :: !(Set FilePath)
@@ -717,8 +719,10 @@ data ConfigMonoid =
     -- ^ See: 'configExtraIncludeDirs'
     ,configMonoidExtraLibDirs        :: !(Set FilePath)
     -- ^ See: 'configExtraLibDirs'
-    , configMonoidOverrideGccPath    :: !(First (Path Abs File))
+    ,configMonoidOverrideGccPath     :: !(First (Path Abs File))
     -- ^ Allow users to override the path to gcc
+    ,configMonoidOverrideHpack       :: !(First FilePath)
+    -- ^ Allow users to override the path to hpack
     ,configMonoidConcurrentTests     :: !(First Bool)
     -- ^ See: 'configConcurrentTests'
     ,configMonoidLocalBinPath        :: !(First FilePath)
@@ -803,6 +807,7 @@ parseConfigMonoidObject rootDir obj = do
     configMonoidExtraLibDirs <- fmap (Set.map (toFilePath rootDir FilePath.</>)) $
         obj ..:?  configMonoidExtraLibDirsName ..!= Set.empty
     configMonoidOverrideGccPath <- First <$> obj ..:? configMonoidOverrideGccPathName
+    configMonoidOverrideHpack <- First <$> obj ..:? configMonoidOverrideHpackName
     configMonoidConcurrentTests <- First <$> obj ..:? configMonoidConcurrentTestsName
     configMonoidLocalBinPath <- First <$> obj ..:? configMonoidLocalBinPathName
     configMonoidImageOpts <- jsonSubWarnings (obj ..:?  configMonoidImageOptsName ..!= mempty)
@@ -927,6 +932,9 @@ configMonoidExtraLibDirsName = "extra-lib-dirs"
 
 configMonoidOverrideGccPathName :: Text
 configMonoidOverrideGccPathName = "with-gcc"
+
+configMonoidOverrideHpackName :: Text
+configMonoidOverrideHpackName = "with-hpack"
 
 configMonoidConcurrentTestsName :: Text
 configMonoidConcurrentTestsName = "concurrent-tests"
